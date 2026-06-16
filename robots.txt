@@ -1,0 +1,10 @@
+# robots.txt — https://lumko.github.io/
+# The portfolio itself is open to search engines.
+# Credential / document files are kept out of search results.
+
+User-agent: *
+Disallow: /docs/
+
+# Optional: also keep the profile photo out of image search.
+# Uncomment the next line if you want that too.
+# Disallow: /img/
