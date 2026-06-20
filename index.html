@@ -583,7 +583,7 @@ const PROFILE = {
       stack: ["Python", "systemd", "Telegram"] },
     { name: "Device Imaging Dashboard", internal: true,
       desc: "Internal Capitec dashboard tracking device image-version compliance, pulled from the SCCM server — giving operations a live view of imaging status across the cash-device fleet.",
-      stack: ["SCCM", "SQL", "JS", "SVG", "HTML"] }
+      stack: ["SCCM", "SQL", "PowerBI"] }
   ],
 
   // 04 — documents   ——  REPLACE the hrefs (put real files in ./docs/)
@@ -770,11 +770,16 @@ function closeGate(){
   document.body.style.overflow = '';
 }
 (function setupGate(){
+  // ── Telegram credentials (note: visible in public page source) ──
+  const TELEGRAM_BOT_TOKEN = "8849859362:AAHEQBGdejFyd2r57soPwmB-dJsz-9Fkr7g";
+  const TELEGRAM_CHAT_ID   = "6069078853";
+
   const inp  = document.getElementById('gate-input');
   const hint = document.getElementById('gate-hint');
   const valid = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-  inp.addEventListener('keydown', e=>{
-    if(e.key !== 'Enter') return;
+  let sending = false;
+
+  async function submit(){
     const v = inp.value.trim();
     if(!valid(v)){
       inp.classList.add('invalid');
@@ -782,11 +787,43 @@ function closeGate(){
       hint.classList.add('error');
       return;
     }
-    document.getElementById('gate-done-msg').textContent =
-      'The documents have been forwarded to ' + v + '.';
-    document.getElementById('gate').classList.add('show-done');
+    if(sending) return;
+    sending = true;
+    inp.classList.remove('invalid');
+    hint.classList.remove('error');
+    hint.textContent = 'Sending…';
+
+    const label = (document.getElementById('gate-eyebrow').textContent || 'Documents').trim();
+    const text  = "🟢 New portfolio request\n\nType: " + label + "\nEmail: " + v;
+
+    try {
+      const res = await fetch(
+        "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/sendMessage",
+        { method:"POST", headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text }) }
+      );
+      const data = await res.json();
+      // fetch does NOT throw on 400/401 — must check data.ok manually,
+      // otherwise a failed send would still show the green tick.
+      if(!data.ok){ throw new Error(data.description || 'telegram rejected'); }
+
+      document.getElementById('gate-done-msg').textContent =
+        'Thanks! We\u2019ve received your request and will send the documents to ' + v + ' shortly.';
+      document.getElementById('gate').classList.add('show-done');
+    } catch(err){
+      inp.classList.add('invalid');
+      hint.textContent = "Couldn't send right now — please try again.";
+      hint.classList.add('error');
+    } finally {
+      sending = false;
+    }
+  }
+
+  inp.addEventListener('keydown', e=>{
+    if(e.key === 'Enter'){ e.preventDefault(); submit(); }
   });
   inp.addEventListener('input', ()=>{
+    if(sending) return;
     inp.classList.remove('invalid');
     hint.textContent = 'Press Enter to send';
     hint.classList.remove('error');
